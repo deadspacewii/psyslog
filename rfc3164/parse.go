@@ -14,7 +14,11 @@ const (
 	TAGDELIMITER = ':'
 )
 
-type Parser struct {
+type TagFunc[T any] func(string) *T
+
+type ContentFunc[D any] func(string) *D
+
+type Parser[T any, D any] struct {
 	buff                  []byte
 	index                 int
 	l                     int
@@ -24,6 +28,18 @@ type Parser struct {
 	location              *time.Location
 	customTagDelimiter    byte
 	customTimestampFormat string
+	customTagFunc         TagFunc[T]
+	customContentFunc     ContentFunc[D]
+}
+
+type ResultRFC3164 struct {
+	Priority  int       `json:"priority"`
+	Facility  int       `json:"facility"`
+	Severity  int       `json:"severity"`
+	Timestamp time.Time `json:"timestamp"`
+	Hostname  string    `json:"hostname"`
+	Tag       any       `json:"tag"`
+	Content   any       `json:"content"`
 }
 
 type header struct {
@@ -36,23 +52,31 @@ type message struct {
 	content string
 }
 
-func NewParser() *Parser {
-	return &Parser{}
+func NewParser[T any, D any]() *Parser[T, D] {
+	return &Parser[T, D]{}
 }
 
-func (p *Parser) WithTimestampFormat(s string) {
+func (p *Parser[T, D]) WithTimestampFormat(s string) {
 	p.customTimestampFormat = s
 }
 
-func (p *Parser) WithLocation(l *time.Location) {
+func (p *Parser[T, D]) WithLocation(l *time.Location) {
 	p.location = l
 }
 
-func (p *Parser) WithTagDelimiter(s byte) {
+func (p *Parser[T, D]) WithTagDelimiter(s byte) {
 	p.customTagDelimiter = s
 }
 
-func (p *Parser) Parse(s string) error {
+func (p *Parser[T, D]) WithTagFunc(t TagFunc[T]) {
+	p.customTagFunc = t
+}
+
+func (p *Parser[T, D]) WithContentFunc(d ContentFunc[D]) {
+	p.customContentFunc = d
+}
+
+func (p *Parser[T, D]) Parse(s string) error {
 	buff := []byte(s)
 	p.buff = buff
 	p.l = int(math.Min(MAXPACKETLEN, float64(len(buff))))
@@ -86,7 +110,35 @@ func (p *Parser) Parse(s string) error {
 	return nil
 }
 
-func (p *Parser) Dump() common.Parts {
+func (p *Parser[T, D]) Dump() *ResultRFC3164 {
+	res := ResultRFC3164{
+		Priority:  p.priority.Priority,
+		Facility:  p.priority.Facility,
+		Severity:  p.priority.Severity,
+		Timestamp: p.header.timestamp,
+		Hostname:  p.header.hostname,
+		Tag:       p.message.tag,
+		Content:   p.message.content,
+	}
+
+	if p.customTagFunc != nil {
+		tag := p.customTagFunc(p.message.tag)
+		if tag != nil {
+			res.Tag = tag
+		}
+	}
+
+	if p.customContentFunc != nil {
+		content := p.customContentFunc(p.message.content)
+		if content != nil {
+			res.Content = content
+		}
+	}
+
+	return &res
+}
+
+/*func (p *Parser[T, D]) Dump() common.Parts {
 	return common.Parts{
 		"timestamp": p.header.timestamp,
 		"hostname":  p.header.hostname,
@@ -96,9 +148,9 @@ func (p *Parser) Dump() common.Parts {
 		"facility":  p.priority.Facility,
 		"severity":  p.priority.Severity,
 	}
-}
+}*/
 
-func (p *Parser) parsePriority() (*common.Priority, error) {
+func (p *Parser[T, D]) parsePriority() (*common.Priority, error) {
 	return common.ParsePriority(
 		p.buff, &p.index, p.l,
 	)
@@ -106,7 +158,7 @@ func (p *Parser) parsePriority() (*common.Priority, error) {
 
 // HEADER: TIMESTAMP + HOSTNAME (or IP)
 // https://tools.ietf.org/html/rfc3164#section-4.1.2
-func (p *Parser) parseHeader() (*header, error) {
+func (p *Parser[T, D]) parseHeader() (*header, error) {
 	var err error
 
 	if p.buff[p.index] == ' ' {
@@ -131,7 +183,7 @@ func (p *Parser) parseHeader() (*header, error) {
 	return hdr, nil
 }
 
-func (p *Parser) parseTimestamp() (time.Time, error) {
+func (p *Parser[T, D]) parseTimestamp() (time.Time, error) {
 	var ts time.Time
 	var err error
 	var tsFmtLen int
@@ -214,7 +266,7 @@ func fixTimestampIfNeeded(ts *time.Time) {
 	*ts = newTs
 }
 
-func (p *Parser) parseHostname() (string, error) {
+func (p *Parser[T, D]) parseHostname() (string, error) {
 	return common.ParseHostname(
 		p.buff, &p.index, p.l,
 	)
@@ -222,7 +274,7 @@ func (p *Parser) parseHostname() (string, error) {
 
 // MSG: TAG + CONTENT
 // https://tools.ietf.org/html/rfc3164#section-4.1.3
-func (p *Parser) parsemessage() (*message, error) {
+func (p *Parser[T, D]) parsemessage() (*message, error) {
 	var err error
 
 	tag, err := p.parseTag()
@@ -244,7 +296,7 @@ func (p *Parser) parsemessage() (*message, error) {
 }
 
 // http://tools.ietf.org/html/rfc3164#section-4.1.3
-func (p *Parser) parseTag() (string, error) {
+func (p *Parser[T, D]) parseTag() (string, error) {
 	var b byte
 	var tag []byte
 	var err error
@@ -285,7 +337,7 @@ func (p *Parser) parseTag() (string, error) {
 	return string(tag), err
 }
 
-func (p *Parser) parseContent() (string, error) {
+func (p *Parser[T, D]) parseContent() (string, error) {
 	if p.index > p.l {
 		return "", common.ErrEOL
 	}
