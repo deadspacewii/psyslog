@@ -32,14 +32,16 @@ type Parser[T any, D any] struct {
 	customContentFunc     ContentFunc[D]
 }
 
-type ResultRFC3164 struct {
-	Priority  int       `json:"priority"`
-	Facility  int       `json:"facility"`
-	Severity  int       `json:"severity"`
-	Timestamp time.Time `json:"timestamp"`
-	Hostname  string    `json:"hostname"`
-	Tag       any       `json:"tag"`
-	Content   any       `json:"content"`
+type ResultRFC3164[T any, D any] struct {
+	Priority      int       `json:"priority"`
+	Facility      int       `json:"facility"`
+	Severity      int       `json:"severity"`
+	Timestamp     time.Time `json:"timestamp"`
+	Hostname      string    `json:"hostname"`
+	OriginTag     string    `json:"origin_tag"`
+	OriginContent string    `json:"origin_content"`
+	Tag           *T        `json:"tag"`
+	Content       *D        `json:"content"`
 }
 
 type header struct {
@@ -60,8 +62,18 @@ func (p *Parser[T, D]) WithTimestampFormat(s string) {
 	p.customTimestampFormat = s
 }
 
-func (p *Parser[T, D]) WithLocation(l *time.Location) {
-	p.location = l
+func (p *Parser[T, D]) WithLocation(location string) {
+	switch location {
+	case "UTC":
+		p.location = time.UTC
+	case "Local":
+		p.location = time.Local
+	default:
+		lic, err := time.LoadLocation(location)
+		if err == nil {
+			p.location = lic
+		}
+	}
 }
 
 func (p *Parser[T, D]) WithTagDelimiter(s byte) {
@@ -110,15 +122,15 @@ func (p *Parser[T, D]) Parse(s string) error {
 	return nil
 }
 
-func (p *Parser[T, D]) Dump() *ResultRFC3164 {
-	res := ResultRFC3164{
-		Priority:  p.priority.Priority,
-		Facility:  p.priority.Facility,
-		Severity:  p.priority.Severity,
-		Timestamp: p.header.timestamp,
-		Hostname:  p.header.hostname,
-		Tag:       p.message.tag,
-		Content:   p.message.content,
+func (p *Parser[T, D]) Dump() *ResultRFC3164[T, D] {
+	res := ResultRFC3164[T, D]{
+		Priority:      p.priority.Priority,
+		Facility:      p.priority.Facility,
+		Severity:      p.priority.Severity,
+		Timestamp:     p.header.timestamp,
+		Hostname:      p.header.hostname,
+		OriginTag:     p.message.tag,
+		OriginContent: p.message.content,
 	}
 
 	if p.customTagFunc != nil {
