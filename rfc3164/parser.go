@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-const (
-	//https://tools.ietf.org/html/rfc3164#section-4.1
-	MAXPACKETLEN = 5120
-	TAGDELIMITER = ':'
-)
-
 type TagFunc[T any] func(string) *T
 
 type ContentFunc[D any] func(string) *D
@@ -150,18 +144,6 @@ func (p *Parser[T, D]) Dump() *ResultRFC3164[T, D] {
 	return &res
 }
 
-/*func (p *Parser[T, D]) Dump() common.Parts {
-	return common.Parts{
-		"timestamp": p.header.timestamp,
-		"hostname":  p.header.hostname,
-		"tag":       p.message.tag,
-		"content":   p.message.content,
-		"priority":  p.priority.Priority,
-		"facility":  p.priority.Facility,
-		"severity":  p.priority.Severity,
-	}
-}*/
-
 func (p *Parser[T, D]) parsePriority() (*common.Priority, error) {
 	return common.ParsePriority(
 		p.buff, &p.index, p.l,
@@ -203,7 +185,7 @@ func (p *Parser[T, D]) parseTimestamp() (time.Time, error) {
 
 	tsFmts := []string{
 		"Jan 02 15:04:05",
-		"Jan 02 15:04:05",
+		"Jan 02 2006 15:04:05",
 	}
 
 	if p.customTimestampFormat != "" {

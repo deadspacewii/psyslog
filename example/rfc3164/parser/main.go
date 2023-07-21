@@ -105,7 +105,7 @@ func parserValue2Json(array []string) string {
 func main() {
 	parser := rfc3164.NewParser[TestTag, TestContent]()
 	parser.WithTimestampFormat("2006-01-02 15:04:05")
-	parser.WithLocation("Asia/Yakutsk")
+	parser.WithLocation("Europe/Sofia")
 	parser.WithTagFunc(parserTag)
 	parser.WithContentFunc(parserContent)
 	if err := parser.Parse(testLog); err != nil {

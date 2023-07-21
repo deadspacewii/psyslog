@@ -15,14 +15,19 @@ var (
 	ErrEOL     = errors.New("End of log line")
 	ErrNoSpace = errors.New("No space found")
 
-	ErrPriorityNoStart  = errors.New("No start char found for priority")
-	ErrPriorityEmpty    = errors.New("Priority field empty")
-	ErrPriorityNoEnd    = errors.New("No end char found for priority")
-	ErrPriorityTooShort = errors.New("Priority field too short")
-	ErrPriorityTooLong  = errors.New("Priority field too short")
-	ErrPriorityNonDigit = errors.New("Priority field too short")
+	ErrPriorityNoStart      = errors.New("No start char found for priority")
+	ErrPriorityEmpty        = errors.New("Priority field empty")
+	ErrPriorityNoEnd        = errors.New("No end char found for priority")
+	ErrPriorityTooShort     = errors.New("Priority field too short")
+	ErrPriorityTooLong      = errors.New("Priority field too long")
+	ErrPriorityNonDigit     = errors.New("Priority field is not digit")
+	ErrPriorityBeyondNumber = errors.New("Priority must between 0 and 191")
 
 	ErrTimestampUnknownFormat = errors.New("Timestamp format unknown")
+
+	ErrHostNameContainSpace = errors.New("HostName contain space")
+
+	ErrTagTooLong = errors.New("tag field too long")
 )
 
 type Priority struct {
