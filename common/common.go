@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	RFC_3164 = iota + 1
+	NO_VERSION = -1
 )
 
 type Parts map[string]interface{}
@@ -22,6 +22,8 @@ var (
 	ErrPriorityTooLong      = errors.New("Priority field too long")
 	ErrPriorityNonDigit     = errors.New("Priority field is not digit")
 	ErrPriorityBeyondNumber = errors.New("Priority must between 0 and 191")
+
+	ErrVersionNotFound = errors.New("Can not find version")
 
 	ErrTimestampUnknownFormat = errors.New("Timestamp format unknown")
 
@@ -79,6 +81,28 @@ func ParsePriority(buff []byte, index *int, l int) (*Priority, error) {
 	return nil, ErrPriorityNoEnd
 }
 
+// https://tools.ietf.org/html/rfc5424#section-6.2.2
+func ParseVersion(buff []byte, index *int, l int) (int, error) {
+	if *index >= l {
+		return NO_VERSION, ErrVersionNotFound
+	}
+
+	c := buff[*index]
+	*index++
+
+	if !IsDigit(c) {
+		return NO_VERSION, ErrVersionNotFound
+	}
+
+	value, err := strconv.Atoi(string(c))
+	if err != nil {
+		*index--
+		return NO_VERSION, err
+	}
+
+	return value, nil
+}
+
 func IsDigit(c byte) bool {
 	return c >= '0' && c <= '9'
 }
@@ -91,15 +115,26 @@ func NewPriority(p int) *Priority {
 	}
 }
 
-func FindNextSpace(buff []byte, from, l int) (int, error) {
-	for to := from; to < l; to++ {
-		if buff[to] == ' ' {
-			to++
-			return to, nil
-		}
+func Parse2Digits(buff []byte, index *int, l int, min int, max int, err error) (int, error) {
+	digitLen := 2
+	if *index+digitLen > l {
+		return 0, ErrEOL
 	}
 
-	return 0, ErrNoSpace
+	sub := string(buff[*index : *index+digitLen])
+
+	*index += digitLen
+
+	value, e := strconv.Atoi(sub)
+	if e != nil {
+		return 0, e
+	}
+
+	if value < min || value > max {
+		return 0, err
+	}
+
+	return value, nil
 }
 
 func ParseHostname(buff []byte, index *int, l int) (string, error) {
@@ -117,4 +152,61 @@ func ParseHostname(buff []byte, index *int, l int) (string, error) {
 	*index = to
 
 	return string(hostname), nil
+}
+
+func ParseUpToLen(buff []byte, index *int, l int, maxLen int, e error) (string, error) {
+	var to int
+	var found bool
+	var result string
+
+	max := *index + maxLen
+
+	for to = *index; (to < max) && (to < l); to++ {
+		if buff[to] == ' ' {
+			found = true
+			break
+		}
+	}
+
+	if found {
+		result = string(buff[*index:to])
+	}
+
+	*index = to
+
+	if found {
+		return result, nil
+	}
+
+	return "", e
+}
+
+func ParseUpToLenOrData(buff []byte, index *int, l int, maxLen int, e error) (string, error) {
+	var to int
+	var found bool
+	var result string
+
+	max := *index + maxLen
+
+	for to = *index; (to < max) && (to < l); to++ {
+		if buff[to] == ' ' || buff[to] == '[' {
+			if buff[to] == ' ' {
+				to++
+			}
+			found = true
+			break
+		}
+	}
+
+	if found {
+		result = string(buff[*index:to])
+	}
+
+	*index = to
+
+	if found {
+		return result, nil
+	}
+
+	return "", e
 }

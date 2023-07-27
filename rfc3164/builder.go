@@ -124,7 +124,7 @@ func (b *Builder) Build() error {
 
 	b.setLocalTime()
 
-	b.result = fmt.Sprintf(RFC3164fORMAT, b.priority, b.timestamp, b.hostName, b.tag, string(b.delimiter), b.content)
+	b.result = fmt.Sprintf(RFC3164FORMAT, b.priority, b.timestamp, b.hostName, b.tag, string(b.delimiter), b.content)
 	return nil
 }
 

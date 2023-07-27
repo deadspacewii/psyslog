@@ -8,5 +8,5 @@ const (
 )
 
 const (
-	RFC3164fORMAT = "<%d>%s %s %s%s%s"
+	RFC3164FORMAT = "<%d>%s %s %s%s%s"
 )
