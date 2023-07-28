@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+type StructureFunc[D any] func(string) *D
+
 var (
 	ErrYearInvalid       = errors.New("Invalid year in timestamp")
 	ErrMonthInvalid      = errors.New("Invalid month in timestamp")
@@ -26,13 +28,28 @@ var (
 	ErrNoStructuredData  = errors.New("No structured data")
 )
 
-type Parser struct {
-	buff           []byte
-	index          int
-	l              int
-	header         *header
-	structuredData string
-	message        string
+type Parser[D any] struct {
+	buff                     []byte
+	index                    int
+	l                        int
+	header                   *header
+	structuredData           string
+	message                  string
+	customStructuredDataFunc StructureFunc[D]
+}
+
+type ResultRFC5424[D any] struct {
+	Priority             int       `json:"priority"`
+	Facility             int       `json:"facility"`
+	Severity             int       `json:"severity"`
+	Timestamp            time.Time `json:"timestamp"`
+	Hostname             string    `json:"hostname"`
+	AppName              string    `json:"app_name"`
+	ProcId               string    `json:"proc_id"`
+	MsgId                string    `json:"msg_id"`
+	Message              string    `json:"message"`
+	OriginStructuredData string    `json:"origin_structured_data"`
+	StructuredData       *D        `json:"structured_data"`
 }
 
 type header struct {
@@ -63,11 +80,11 @@ type partialTime struct {
 	secFrac float64
 }
 
-func NewParser() *Parser {
-	return &Parser{}
+func NewParser[D any]() *Parser[D] {
+	return &Parser[D]{}
 }
 
-func (p *Parser) Parse(s string) error {
+func (p *Parser[D]) Parse(s string) error {
 	buff := []byte(s)
 	p.buff = buff
 	p.l = int(math.Min(MAXPACKETLEN, float64(len(buff))))
@@ -99,7 +116,35 @@ func (p *Parser) Parse(s string) error {
 	return nil
 }
 
-func (p *Parser) Dump() common.Parts {
+func (p *Parser[D]) WithStructuredDataFunc(d StructureFunc[D]) {
+	p.customStructuredDataFunc = d
+}
+
+func (p *Parser[D]) Dump() *ResultRFC5424[D] {
+	res := ResultRFC5424[D]{
+		Priority:             p.header.priority.Priority,
+		Facility:             p.header.priority.Facility,
+		Severity:             p.header.priority.Severity,
+		Timestamp:            p.header.timestamp,
+		Hostname:             p.header.hostname,
+		AppName:              p.header.appName,
+		ProcId:               p.header.procId,
+		MsgId:                p.header.msgId,
+		OriginStructuredData: p.structuredData,
+		Message:              p.message,
+	}
+
+	if p.customStructuredDataFunc != nil {
+		content := p.customStructuredDataFunc(p.structuredData)
+		if content != nil {
+			res.StructuredData = content
+		}
+	}
+
+	return &res
+}
+
+/*func (p *Parser[D]) Dump() common.Parts {
 	return common.Parts{
 		"priority":        p.header.priority.Priority,
 		"facility":        p.header.priority.Facility,
@@ -113,10 +158,10 @@ func (p *Parser) Dump() common.Parts {
 		"structured_data": p.structuredData,
 		"message":         p.message,
 	}
-}
+}*/
 
 // HEADER = PRI VERSION SP TIMESTAMP SP HOSTNAME SP APP-NAME SP PROCID SP MSGID
-func (p *Parser) parseHeader() (*header, error) {
+func (p *Parser[D]) parseHeader() (*header, error) {
 	pri, err := p.parsePriority()
 	if err != nil {
 		return nil, err
@@ -173,18 +218,18 @@ func (p *Parser) parseHeader() (*header, error) {
 	return hdr, nil
 }
 
-func (p *Parser) parsePriority() (*common.Priority, error) {
+func (p *Parser[D]) parsePriority() (*common.Priority, error) {
 	return common.ParsePriority(
 		p.buff, &p.index, p.l,
 	)
 }
 
-func (p *Parser) parseVersion() (int, error) {
+func (p *Parser[D]) parseVersion() (int, error) {
 	return common.ParseVersion(p.buff, &p.index, p.l)
 }
 
 // https://tools.ietf.org/html/rfc5424#section-6.2.3
-func (p *Parser) parseTimestamp() (*time.Time, error) {
+func (p *Parser[D]) parseTimestamp() (*time.Time, error) {
 	if p.buff[p.index] == NILVALUE {
 		p.index++
 		return new(time.Time), nil
@@ -235,7 +280,7 @@ func (p *Parser) parseTimestamp() (*time.Time, error) {
 }
 
 // HOSTNAME = NILVALUE / 1*255PRINTUSASCII
-func (p *Parser) parseHostname() (string, error) {
+func (p *Parser[D]) parseHostname() (string, error) {
 	h, err := common.ParseHostname(p.buff, &p.index, p.l)
 
 	p.index++
@@ -244,23 +289,23 @@ func (p *Parser) parseHostname() (string, error) {
 }
 
 // APP-NAME = NILVALUE / 1*48PRINTUSASCII
-func (p *Parser) parseAppName() (string, error) {
+func (p *Parser[D]) parseAppName() (string, error) {
 	return common.ParseUpToLen(p.buff, &p.index, p.l, 48, ErrInvalidAppName)
 }
 
 // PROCID = NILVALUE / 1*128PRINTUSASCII
-func (p *Parser) parseProcId() (string, error) {
+func (p *Parser[D]) parseProcId() (string, error) {
 	return common.ParseUpToLen(p.buff, &p.index, p.l, 128, ErrInvalidProcId)
 }
 
 // MSGID = NILVALUE / 1*32PRINTUSASCII
-func (p *Parser) parseMsgId() (string, error) {
+func (p *Parser[D]) parseMsgId() (string, error) {
 	return common.ParseUpToLenOrData(
 		p.buff, &p.index, p.l, 32, ErrInvalidMsgId,
 	)
 }
 
-func (p *Parser) parseStructuredData() (string, error) {
+func (p *Parser[D]) parseStructuredData() (string, error) {
 	return parseStructuredData(p.buff, &p.index, p.l)
 }
 
