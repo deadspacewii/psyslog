@@ -210,3 +210,11 @@ func ParseUpToLenOrData(buff []byte, index *int, l int, maxLen int, e error) (st
 
 	return "", e
 }
+
+func CheckPriority(priority int) error {
+	if priority < 0 || priority > 191 {
+		return ErrPriorityBeyondNumber
+	}
+
+	return nil
+}

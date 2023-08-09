@@ -63,7 +63,7 @@ func (b *Builder) setLocalTime() *Builder {
 }
 
 func (b *Builder) check() error {
-	if err := checkPriority(b.priority); err != nil {
+	if err := common.CheckPriority(b.priority); err != nil {
 		return err
 	}
 
@@ -73,14 +73,6 @@ func (b *Builder) check() error {
 
 	if err := checkTag(b.tag, b.delimiter); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func checkPriority(priority int) error {
-	if priority < 0 || priority > 191 {
-		return common.ErrPriorityBeyondNumber
 	}
 
 	return nil

@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-type TagFunc[T any] func(string) *T
+type TagFunc[T any] func(string) (T, error)
 
-type ContentFunc[D any] func(string) *D
+type ContentFunc[D any] func(string) (D, error)
 
 type Parser[T any, D any] struct {
 	buff                  []byte
@@ -34,8 +34,10 @@ type ResultRFC3164[T any, D any] struct {
 	Hostname      string    `json:"hostname"`
 	OriginTag     string    `json:"origin_tag"`
 	OriginContent string    `json:"origin_content"`
-	Tag           *T        `json:"tag"`
-	Content       *D        `json:"content"`
+	Tag           T         `json:"tag"`
+	TagError      error     `json:"tag_error"`
+	Content       D         `json:"content"`
+	ContentError  error     `json:"content_error"`
 }
 
 type header struct {
@@ -125,18 +127,24 @@ func (p *Parser[T, D]) Dump() *ResultRFC3164[T, D] {
 		Hostname:      p.header.hostname,
 		OriginTag:     p.message.tag,
 		OriginContent: p.message.content,
+		TagError:      nil,
+		ContentError:  nil,
 	}
 
 	if p.customTagFunc != nil {
-		tag := p.customTagFunc(p.message.tag)
-		if tag != nil {
+		tag, err := p.customTagFunc(p.message.tag)
+		if err != nil {
+			res.TagError = err
+		} else {
 			res.Tag = tag
 		}
 	}
 
 	if p.customContentFunc != nil {
-		content := p.customContentFunc(p.message.content)
-		if content != nil {
+		content, err := p.customContentFunc(p.message.content)
+		if err != nil {
+			res.ContentError = err
+		} else {
 			res.Content = content
 		}
 	}

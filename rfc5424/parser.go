@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type StructureFunc[D any] func(string) *D
+type StructureFunc[D any] func(string) (D, error)
 
 var (
 	ErrYearInvalid       = errors.New("Invalid year in timestamp")
@@ -42,6 +42,7 @@ type ResultRFC5424[D any] struct {
 	Priority             int       `json:"priority"`
 	Facility             int       `json:"facility"`
 	Severity             int       `json:"severity"`
+	Version              int       `json:"version"`
 	Timestamp            time.Time `json:"timestamp"`
 	Hostname             string    `json:"hostname"`
 	AppName              string    `json:"app_name"`
@@ -49,7 +50,8 @@ type ResultRFC5424[D any] struct {
 	MsgId                string    `json:"msg_id"`
 	Message              string    `json:"message"`
 	OriginStructuredData string    `json:"origin_structured_data"`
-	StructuredData       *D        `json:"structured_data"`
+	StructuredData       D         `json:"structured_data"`
+	StructuredErr        error     `json:"structured_err"`
 }
 
 type header struct {
@@ -125,6 +127,7 @@ func (p *Parser[D]) Dump() *ResultRFC5424[D] {
 		Priority:             p.header.priority.Priority,
 		Facility:             p.header.priority.Facility,
 		Severity:             p.header.priority.Severity,
+		Version:              p.header.version,
 		Timestamp:            p.header.timestamp,
 		Hostname:             p.header.hostname,
 		AppName:              p.header.appName,
@@ -132,11 +135,14 @@ func (p *Parser[D]) Dump() *ResultRFC5424[D] {
 		MsgId:                p.header.msgId,
 		OriginStructuredData: p.structuredData,
 		Message:              p.message,
+		StructuredErr:        nil,
 	}
 
 	if p.customStructuredDataFunc != nil {
-		content := p.customStructuredDataFunc(p.structuredData)
-		if content != nil {
+		content, err := p.customStructuredDataFunc(p.structuredData)
+		if err != nil {
+			res.StructuredErr = err
+		} else {
 			res.StructuredData = content
 		}
 	}
