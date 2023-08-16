@@ -8,13 +8,13 @@ import (
 )
 
 type Builder struct {
-	timestamp string `json:"Timestamp"`
-	priority  int    `json:"priority"`
-	hostName  string `json:"hostName"`
-	tag       string `json:"tag"`
-	delimiter byte   `json:"delimiter"`
-	content   string `json:"content"`
-	result    string `json:"result"`
+	timestamp string
+	priority  int
+	hostName  string
+	tag       string
+	delimiter byte
+	content   string
+	result    string
 }
 
 func NewBuilder() *Builder {

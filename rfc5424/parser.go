@@ -150,22 +150,6 @@ func (p *Parser[D]) Dump() *ResultRFC5424[D] {
 	return &res
 }
 
-/*func (p *Parser[D]) Dump() common.Parts {
-	return common.Parts{
-		"priority":        p.header.priority.Priority,
-		"facility":        p.header.priority.Facility,
-		"severity":        p.header.priority.Severity,
-		"version":         p.header.version,
-		"timestamp":       p.header.timestamp,
-		"hostname":        p.header.hostname,
-		"app_name":        p.header.appName,
-		"proc_id":         p.header.procId,
-		"msg_id":          p.header.msgId,
-		"structured_data": p.structuredData,
-		"message":         p.message,
-	}
-}*/
-
 // HEADER = PRI VERSION SP TIMESTAMP SP HOSTNAME SP APP-NAME SP PROCID SP MSGID
 func (p *Parser[D]) parseHeader() (*header, error) {
 	pri, err := p.parsePriority()
@@ -236,53 +220,7 @@ func (p *Parser[D]) parseVersion() (int, error) {
 
 // https://tools.ietf.org/html/rfc5424#section-6.2.3
 func (p *Parser[D]) parseTimestamp() (*time.Time, error) {
-	if p.buff[p.index] == NILVALUE {
-		p.index++
-		return new(time.Time), nil
-	}
-
-	fd, err := parseFullDate(
-		p.buff, &p.index, p.l,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if p.buff[p.index] != 'T' {
-		return nil, ErrInvalidTimeFormat
-	}
-
-	p.index++
-
-	ft, err := parseFullTime(
-		p.buff, &p.index, p.l,
-	)
-
-	if err != nil {
-		return nil, common.ErrTimestampUnknownFormat
-	}
-
-	nSec, err := toNSec(
-		ft.pt.secFrac,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	ts := time.Date(
-		fd.year,
-		time.Month(fd.month),
-		fd.day,
-		ft.pt.hour,
-		ft.pt.minute,
-		ft.pt.seconds,
-		nSec,
-		ft.loc,
-	)
-
-	return &ts, nil
+	return parseDate(p.buff, &p.index, p.l)
 }
 
 // HOSTNAME = NILVALUE / 1*255PRINTUSASCII
@@ -313,6 +251,56 @@ func (p *Parser[D]) parseMsgId() (string, error) {
 
 func (p *Parser[D]) parseStructuredData() (string, error) {
 	return parseStructuredData(p.buff, &p.index, p.l)
+}
+
+func parseDate(buff []byte, index *int, l int) (*time.Time, error) {
+	if buff[*index] == NILVALUE {
+		*index++
+		return new(time.Time), nil
+	}
+
+	fd, err := parseFullDate(
+		buff, index, l,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if buff[*index] != 'T' {
+		return nil, ErrInvalidTimeFormat
+	}
+
+	*index++
+
+	ft, err := parseFullTime(
+		buff, index, l,
+	)
+
+	if err != nil {
+		return nil, common.ErrTimestampUnknownFormat
+	}
+
+	nSec, err := toNSec(
+		ft.pt.secFrac,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	ts := time.Date(
+		fd.year,
+		time.Month(fd.month),
+		fd.day,
+		ft.pt.hour,
+		ft.pt.minute,
+		ft.pt.seconds,
+		nSec,
+		ft.loc,
+	)
+
+	return &ts, nil
 }
 
 // FULL-DATE : DATE-FULLYEAR "-" DATE-MONTH "-" DATE-MDAY

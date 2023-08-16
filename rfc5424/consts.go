@@ -10,3 +10,7 @@ const (
 	SUBSIDIARYTIMEFORMAT      = "2006-01-02 15:04:05-07:00"
 	SUBSIDIARYTIMECHILDFORMAT = "2006-01-02 15:04:05"
 )
+
+const (
+	RFC5424FORMAT = "<%d>%d %s %s %s %s %s %s"
+)

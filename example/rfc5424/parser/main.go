@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var testLog = `<189>1 2021-02-28T16:24:40.332+08:00 8.35.34.57 ATIC - -[log_type=device_drop_flow time="2021-07-14 16:24:40" device_ip=8.35.34.57 ]`
+var testLog = `<189>1 2003-08-24T05:14:15.000003-07:00 8.35.34.57 ATIC - -[log_type=device_drop_flow time="2021-07-14 16:24:40" device_ip=8.35.34.57 ]`
 
 type TestContent struct {
 	LogType      string `json:"log_type"`
@@ -18,7 +18,7 @@ type TestContent struct {
 	IsIpLocation bool   `json:"is_ipLocation"`
 }
 
-func parserContent(s string) *TestContent {
+func parserContent(s string) (TestContent, error) {
 	array := make([]string, 0)
 	content := TestContent{}
 	s = strings.TrimSpace(s[1 : len(s)-1])
@@ -44,10 +44,10 @@ func parserContent(s string) *TestContent {
 	jsonStr := parserValue2Json(array)
 	if err := json.Unmarshal([]byte(jsonStr), &content); err != nil {
 		log.Fatal(err.Error())
-		return nil
+		return TestContent{}, err
 	}
 
-	return &content
+	return content, nil
 }
 
 func parserValue2Json(array []string) string {
@@ -83,5 +83,5 @@ func main() {
 	}
 
 	result := parser.Dump()
-	fmt.Println(result.StructuredData)
+	fmt.Println(result.Timestamp)
 }
